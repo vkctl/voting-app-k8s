@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  
+permissions:
+  contents: read
+  package: write
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/Checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: run build script
+        run: |
+          ./scripts/build-image.sh
