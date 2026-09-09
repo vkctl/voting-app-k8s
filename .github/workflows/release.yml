@@ -40,7 +40,7 @@ jobs:
           SERVICES=(vote worker result)
           for svc in "${SERVICES[@]}"; do
             SVC_SHA=$(git log -1 --format=%h -- "app/$svc")
-            if [[ -z "$SVC_SHA "]]; then
+            if [[ -z "$SVC_SHA" ]]; then
               echo "::error::No commit found touching app/$svc — can't resolve an image"
               exit 1
             fi
