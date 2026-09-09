@@ -6,7 +6,10 @@ on:
   
 permissions:
   contents: read
-  package: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
 
 jobs:
   build:
@@ -20,6 +23,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: run build script
-        run: |
-          ./scripts/build-image.sh
+        run: ./scripts/build-and-push.sh "" "${{ github.event.before }}"
