@@ -21,8 +21,12 @@ for svc in "${SERVICES[@]}"; do
   echo "==> building $svc:$TAG"
   docker build -t "$REGISTRY/$svc:$TAG" "./app/$svc"
 
+  echo "==> tagging $svc as dev-latest"
+  docker tag "$REGISTRY/$svc:$TAG" "$REGISTRY/$svc:dev-latest"
+
   echo "==> pushing $svc:$TAG"
   docker push "$REGISTRY/$svc:$TAG"
+  docker push "$REGISTRY/$svc:dev-latest"
 done
 
 echo "Done."
