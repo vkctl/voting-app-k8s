@@ -1,0 +1,27 @@
+apiVersion: nwtworking.k8s.io/v1
+kind: ingress
+metadata: 
+  name: voting-app
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: vote.local
+      http:
+        paths:
+          - path: /
+            pathType: prefix
+            backend:
+              service:
+                name: vote
+                port:
+                  number: 80
+    - host: result.local
+      http:
+        paths:
+          - path: /
+            pathType: prefix
+            backend:
+              service:
+                name: result
+                port:
+                  number: 80
