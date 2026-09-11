@@ -18,7 +18,7 @@ is the source of truth; update it as decisions change.
 
 ## Status
 
-Phase 0 — understanding the app locally. Not yet deployed anywhere.
+Phase 3/4 — Local Kubernetes Deployment
 
 ## Local dev
 
