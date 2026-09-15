@@ -29,7 +29,7 @@ resource "aws_subnet" "public" {
 
     tags = {
         Name = "${var.project_name}-public-${count.index}"
-        "kubernetes.io/clusters/${var.cluster_name}" = "shared"
+        "kubernetes.io/cluster/${var.cluster_name}" = "shared"
         "kubernetes.io/role/elb" = "1"
     }
 }
