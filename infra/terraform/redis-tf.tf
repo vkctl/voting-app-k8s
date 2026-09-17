@@ -15,7 +15,7 @@ resource "kubernetes_deployment_v1" "redis" {
         template {
             metadata {
                 labels = {
-                    app = "redis
+                    app = "redis"
                 }
             }
 
