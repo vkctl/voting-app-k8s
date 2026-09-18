@@ -11,6 +11,8 @@ resource "kubernetes_secret_v1" "db_credentials" {
 }
 
 resource "kubernetes_persistent_volume_claim_v1" "db_data" {
+  wait_until_bound = false
+
   metadata {
     name = "db-data"
   }
