@@ -34,6 +34,14 @@ provider "kubernetes" {
   token = data.aws_eks_cluster_auth.main.token
 }
 
+provider "helm" {
+  kubernetes {
+    host = data.aws_eks_cluster.main.endpoint
+    cluster_ca_certificate = base64decode(data.aws_eks_cluster.main.certificate_authority[0].data)
+    token = data.aws_eks_cluster_auth.main.token
+  }
+}
+
 resource "kubernetes_storage_class_v1" "ebs_gp3" {
   metadata {
     name = "ebs-gp3"
