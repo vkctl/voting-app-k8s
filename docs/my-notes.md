@@ -63,7 +63,7 @@ Considered using **AWS VPC IPAM** (hierarchical, structured CIDR allocation by e
 
 Next: destroy this environment cleanly, confirm it in the AWS console, then rebuild via `terraform apply` to prove the fast recreate loop — the actual reason all of this was built to be destroyable from day one.
 
-## Phase 3 continued — Terraform deploys the app itself (Reddit OP's pattern)
+## Phase 3 continued — Terraform deploys the app itself
 
 Destroyed and recreated cleanly (confirmed the fast rebuild loop works — ~10 minutes for the full cluster from scratch). Then split Terraform into two separate configs, `cluster/` and `app/`, after hitting a real bug: the `kubernetes`/`helm` providers, when configured using a *direct resource reference* to the cluster being created in the same run (`aws_eks_cluster.main.endpoint`), silently fell back to `localhost` instead of the real cluster — a documented chicken-and-egg provider-timing issue. Fixed by having `app/` use `data` source *lookups* ("find the cluster that already exists") instead of resource references, which resolved cleanly every time after.
 
@@ -78,6 +78,6 @@ Translated the Kubernetes manifests from the kind phase into native Terraform HC
 - The `helm` provider failed with "cluster unreachable" — turned out to be a genuinely missing kubernetes auth block in that provider's config, not a provider-timing bug as first suspected. Worth remembering: check for the boring explanation before the exotic one, even when a symptom resembles a bug seen before.
 - Path-based Ingress routing (`/vote`, `/result` on one shared Load Balancer) broke both apps' JS/CSS: their HTML references assets via *absolute* paths, which a path-rewrite can't retroactively fix inside already-served HTML. Fixed by giving `vote` and `result` each their own `type: LoadBalancer` Service instead — simpler and more reliable than chasing host-based routing via a Load Balancer's non-static IP, at the cost of a second small Load Balancer charge.
 
-**Other real concepts learned:** IRSA vs. node-level IAM roles (workload-specific badge vs. shared node badge), Terraform's `helm_release` resource as a higher level of abstraction than raw HCL resources (delegates real complexity to a published chart), image tag passed as a Terraform *variable* (`-var="worker_image_tag=<sha>"`) rather than hardcoded — the actual mechanism matching the Reddit OP's "build once, promote via a variable" pattern — and `ImplementationSpecific` path types marking controller-specific (non-portable) Ingress behavior.
+**Other real concepts learned:** IRSA vs. node-level IAM roles (workload-specific badge vs. shared node badge), Terraform's `helm_release` resource as a higher level of abstraction than raw HCL resources (delegates real complexity to a published chart), image tag passed as a Terraform *variable* (`-var="worker_image_tag=<sha>"`) rather than hardcoded — a build-once, promote-via-variable pattern common in real CI/CD pipelines — and `ImplementationSpecific` path types marking controller-specific (non-portable) Ingress behavior.
 
 Whole app now running end-to-end on real AWS, fully provisioned via Terraform. Next: deliberately drift something on this live cluster and watch Terraform fail to notice, then bring in Argo CD.
