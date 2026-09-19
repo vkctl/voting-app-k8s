@@ -44,7 +44,7 @@ resource "kubernetes_service_v1" "vote" {
     }
 
     port {
-      port        = 80
+      port = 80
       target_port = 80
     }
   }
