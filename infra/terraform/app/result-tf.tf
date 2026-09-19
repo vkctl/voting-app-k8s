@@ -39,6 +39,7 @@ resource "kubernetes_service_v1" "result" {
   }
 
   spec {
+    type = "LoadBalancer"
     selector = {
       app = "result"
     }
