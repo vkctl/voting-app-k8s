@@ -1,10 +1,11 @@
-resource "kubernetes_manifest" "vote_app" {
+resource "kubernetes_manifest" "voting_app" {
     manifest = {
         apiVersion = "argoproj.io/v1alpha1"
         kind = "Application"
         metadata = {
             name = "voting-app"
             namespace = "argocd"
+            finalizers = ["resources-finalizer.argocd.argoproj.io"]
         }
         spec = {
             project = "default"
