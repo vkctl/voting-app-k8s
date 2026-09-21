@@ -3,7 +3,7 @@ resource "kubernetes_manifest" "vote_app" {
         apiVersion = "argoproj.io/v1alpha1"
         kind = "Application"
         metadata = {
-            name = "vote"
+            name = "voting-app"
             namespace = "argocd"
         }
         spec = {
