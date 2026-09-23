@@ -9,7 +9,7 @@ module "eks" {
 
   enable_cluster_creator_admin_permissions = true
  
-  enable_irsa = true
+#  enable_irsa = true
 
   vpc_id = module.vpc.vpc_id
   subnet_ids = module.vpc.public_subnets
@@ -38,13 +38,19 @@ module "eks" {
       most_recent = true
     }
 
-    aws-ebs-csi-driver = {
+    eks-pod-identity-agent = {
+      before_compute = true
       most_recent = true
-      service_account_role_arn = module.ebs_csi_irsa.arn
     }
 
-    eks-pod-identity-agent = {
+    aws-ebs-csi-driver = {
       most_recent = true
+      pod_identity_association = [
+        {
+        role_arn = module.ebs_csi_pod_identity.iam_role_arn
+        service_account = "ebs-csi-controller-sa"
+        }
+      ]
     }
   }
 
@@ -54,17 +60,10 @@ module "eks" {
 }
 
 
-module "ebs_csi_irsa" {
-  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts"
-  version = "~> 6.0"
+module "ebs_csi_pod_identity" {
+  source  = "terraform-aws-modules/eks-pod-identity/aws"
+  version = "~> 2.0"
 
-  name = "${var.project_name}-ebs-csi-driver-role"
-  attach_ebs_csi_policy = true
-
-  oidc_providers = {
-    main = {
-      provider_arn = module.eks.oidc_provider_arn
-      namespace_service_accounts = ["kube-system:ebs-csi-controller-sa"]
-    }
-  }
+  name = "${var.project_name}-aws-ebs-csi"
+  attach_aws_ebs_csi_policy = true
 }
