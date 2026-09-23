@@ -21,7 +21,7 @@ resource "kubernetes_manifest" "ec2nodeclass_default" {
     }
   }
 
-  depends_on = [helm_release.karpenter_crd]
+  depends_on = [helm_release.karpenter, helm_release.karpenter_crd]
 }
 
 
@@ -64,5 +64,5 @@ resource "kubernetes_manifest" "nodepool_default" {
     }
   }
 
-  depends_on = [helm_release.karpenter_crd]
+  depends_on = [helm_release.karpenter, helm_release.karpenter_crd]
 }
