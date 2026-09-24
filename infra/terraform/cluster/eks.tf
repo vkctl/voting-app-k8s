@@ -14,7 +14,7 @@ module "eks" {
   subnet_ids = module.vpc.public_subnets
 
 # Currently t3.small has max cap of pods at 11 due to AWS_CNI
-# Alternates option a: include Prefix delegation to vpc cni addon - assigns 110 ips to a node so it, to limit add bootstrap args to eks managed node eks_managed_node_groups
+# Alternates option a: include Prefix delegation to vpc cni addon - assigns /28 subnets to a node, to limit add bootstrap args to eks managed node eks_managed_node_groups
 # option b: use cilium
 # option c: increase desired nodes
   eks_managed_node_groups = {
@@ -23,7 +23,9 @@ module "eks" {
       capacity_type  = "ON_DEMAND"
       min_size       = 1
       max_size       = 5
-      desired_size   = 3
+      desired_size   = 2
+
+      kubelet_extra_args = "--max-pods=32"
     }
   }
 
@@ -31,6 +33,12 @@ module "eks" {
     vpc-cni = {
       most_recent = true
       before_compute = true
+      configuration_values = jsonencode({
+        env = {
+          ENABLE_PREFIX_DELEGATION = "true"
+          WARM_PREFIX_TARGET = "1"
+        }
+      })
     }
 
     coredns = {

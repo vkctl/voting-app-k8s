@@ -18,6 +18,9 @@ resource "kubernetes_manifest" "ec2nodeclass_default" {
       securityGroupSelectorTerms = [
         { tags = { "karpenter.sh/discovery" = "voting-app" } }
       ]
+      kubelet = {
+        maxPods = 32
+      }
     }
   }
 
