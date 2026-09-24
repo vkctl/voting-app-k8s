@@ -25,7 +25,7 @@ spec:
               cpu: 50m
               memory: 128Mi
             limits:
-              cpu: 250
+              cpu: 250m
               memory: 256Mi
 ---
 apiVersion: v1
