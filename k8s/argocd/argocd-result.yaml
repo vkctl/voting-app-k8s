@@ -20,6 +20,13 @@ spec:
           image: ghcr.io/vkctl/result:dev-latest
           ports:
             - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limit:
+              cpu: 250m
+              memory: 128Mi
 ---
 apiVersion: v1
 kind: Service
