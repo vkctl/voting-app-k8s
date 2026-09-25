@@ -22,8 +22,8 @@ module "eks" {
       instance_types = ["t3.small"]
       capacity_type  = "ON_DEMAND"
       min_size       = 1
-      max_size       = 5
-      desired_size   = 2
+      max_size       = 8
+      desired_size   = 3
 
       kubelet_extra_args = "--max-pods=32"
     }
