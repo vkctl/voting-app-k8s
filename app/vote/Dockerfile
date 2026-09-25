@@ -13,6 +13,13 @@ WORKDIR /usr/local/app
 COPY requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Shared by BOTH dev and final stages below — the app always calls
+# MultiProcessCollector regardless of which server runs it (Flask's dev
+# server locally, gunicorn in prod), so both paths need this directory to
+# exist, not just the production one.
+ENV PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
+RUN mkdir -p /tmp/prometheus_multiproc
+
 # dev defines a stage for development, where it'll watch for filesystem changes
 FROM base AS dev
 RUN pip install watchdog

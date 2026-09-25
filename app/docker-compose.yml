@@ -4,9 +4,11 @@
 
 services:
   vote:
+    environment:
+      PROMETHEUS_MULTIPROC_DIR: "/tmp/prometheus_multiproc"
     build: 
       context: ./vote
-      target: dev
+#      target: dev
     depends_on:
       redis:
         condition: service_healthy
