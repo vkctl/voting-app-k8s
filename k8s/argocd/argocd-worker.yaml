@@ -18,3 +18,20 @@ spec:
       containers:
         - name: worker
           image: ghcr.io/vkctl/worker:dev-latest
+          ports:
+            - name: metrics
+              containerPort: 9090
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 9090
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 9090
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            failureThreshold: 3
