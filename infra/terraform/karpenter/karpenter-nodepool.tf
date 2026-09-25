@@ -42,7 +42,7 @@ resource "kubernetes_manifest" "nodepool_default" {
             {
               key = "node.kubernetes.io/instance-type"
               operator = "In"
-              values   = ["t3.micro", "t3.small"]
+              values   = ["t3.small"]
             },
             {
               key = "karpenter.sh/capacity-type"
