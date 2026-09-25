@@ -25,4 +25,8 @@ RUN dotnet publish -c release -o /app -a $TARGETARCH --self-contained false --no
 FROM mcr.microsoft.com/dotnet/runtime:7.0
 WORKDIR /app
 COPY --from=build /app .
+# New: the metrics server's port — documentation only (EXPOSE doesn't
+# actually open anything), but worth stating explicitly now that this
+# app listens on a network port for the first time.
+EXPOSE 9090
 ENTRYPOINT ["dotnet", "Worker.dll"]

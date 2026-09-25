@@ -1,19 +1,51 @@
 using System;
 using System.Data.Common;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using Newtonsoft.Json;
 using Npgsql;
+using Prometheus;
 using StackExchange.Redis;
 
 namespace Worker
 {
     public class Program
     {
+        // --- Metrics setup ---
+        // No existing HTTP server anywhere in this app (unlike vote/result) —
+        // MetricServer runs its own tiny standalone HttpListener-based server
+        // just for /metrics, no ASP.NET Core dependency needed, matching the
+        // plain dotnet/runtime image this Dockerfile deliberately uses.
+        private static readonly Counter VotesProcessed = Metrics.CreateCounter(
+            "worker_votes_processed_total", "Total votes processed",
+            new CounterConfiguration { LabelNames = new[] { "outcome" } }); // "insert" (new voter) or "update" (changed vote)
+
+        private static readonly Histogram VoteProcessingDuration = Metrics.CreateHistogram(
+            "worker_vote_processing_duration_seconds", "Time to process a single vote (pop through db write)");
+
+        // THE metric that actually reveals the bottleneck: how many votes are
+        // sitting in Redis waiting, sampled every loop iteration — not just
+        // when one happens to get processed. Under load, this should climb
+        // and stay high, visibly proving the ~10/sec ceiling from Thread.Sleep(100).
+        private static readonly Gauge RedisQueueLength = Metrics.CreateGauge(
+            "worker_redis_queue_length", "Current number of votes waiting in the Redis queue");
+
+        private static readonly Counter RedisReconnects = Metrics.CreateCounter(
+            "worker_redis_reconnects_total", "Times the Redis connection was recreated");
+
+        private static readonly Counter DbReconnects = Metrics.CreateCounter(
+            "worker_db_reconnects_total", "Times the Postgres connection was recreated");
+        // --- End metrics setup ---
+
         public static int Main(string[] args)
         {
+            var metricServer = new MetricServer(port: 9090);
+            metricServer.Start();
+            Console.WriteLine("Metrics server listening on :9090/metrics");
+
             try
             {
                 var pgsql = OpenDbConnection("Server=db;Username=postgres;Password=postgres;");
@@ -36,10 +68,15 @@ namespace Worker
                         Console.WriteLine("Reconnecting Redis");
                         redisConn = OpenRedisConnection("redis");
                         redis = redisConn.GetDatabase();
+                        RedisReconnects.Inc();
                     }
+
+                    RedisQueueLength.Set(redis.ListLength("votes"));
+
                     string json = redis.ListLeftPopAsync("votes").Result;
                     if (json != null)
                     {
+                        var sw = Stopwatch.StartNew();
                         var vote = JsonConvert.DeserializeAnonymousType(json, definition);
                         Console.WriteLine($"Processing vote for '{vote.vote}' by '{vote.voter_id}'");
                         // Reconnect DB if down
@@ -47,10 +84,14 @@ namespace Worker
                         {
                             Console.WriteLine("Reconnecting DB");
                             pgsql = OpenDbConnection("Server=db;Username=postgres;Password=postgres;");
+                            DbReconnects.Inc();
                         }
                         else
                         { // Normal +1 vote requested
-                            UpdateVote(pgsql, vote.voter_id, vote.vote);
+                            var outcome = UpdateVote(pgsql, vote.voter_id, vote.vote);
+                            sw.Stop();
+                            VoteProcessingDuration.Observe(sw.Elapsed.TotalSeconds);
+                            VotesProcessed.Labels(outcome).Inc();
                         }
                     }
                     else
@@ -130,7 +171,10 @@ namespace Worker
                 .First(a => a.AddressFamily == AddressFamily.InterNetwork)
                 .ToString();
 
-        private static void UpdateVote(NpgsqlConnection connection, string voterId, string vote)
+        // Now returns which outcome happened ("insert" or "update"), so the
+        // caller can label VotesProcessed correctly — same DB behavior as
+        // before, just reporting back what it did.
+        private static string UpdateVote(NpgsqlConnection connection, string voterId, string vote)
         {
             var command = connection.CreateCommand();
             try
@@ -139,11 +183,13 @@ namespace Worker
                 command.Parameters.AddWithValue("@id", voterId);
                 command.Parameters.AddWithValue("@vote", vote);
                 command.ExecuteNonQuery();
+                return "insert";
             }
             catch (DbException)
             {
                 command.CommandText = "UPDATE votes SET vote = @vote WHERE id = @id";
                 command.ExecuteNonQuery();
+                return "update";
             }
             finally
             {

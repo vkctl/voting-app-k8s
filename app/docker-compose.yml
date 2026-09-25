@@ -45,11 +45,13 @@ services:
   worker:
     build:
       context: ./worker
+    ports:
+      - "9090:9090"
     depends_on:
       redis:
         condition: service_healthy 
       db:
-        condition: service_healthy 
+        condition: service_healthy
     networks:
       - back-tier
 
