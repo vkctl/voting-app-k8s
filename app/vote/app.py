@@ -7,6 +7,7 @@ import json
 import logging
 import time
 from prometheus_client import Counter, Histogram, CollectorRegistry, multiprocess, generate_latest, CONTENT_TYPE_LATEST
+from opentelemetry import propagate
 
 option_a = os.getenv('OPTION_A', "Cats")
 option_b = os.getenv('OPTION_B', "Dogs")
@@ -75,7 +76,20 @@ def hello():
         redis = get_redis()
         vote = request.form['vote']
         app.logger.info('Received vote for %s', vote)
-        data = json.dumps({'voter_id': voter_id, 'vote': vote})
+
+        # THE manual propagation step: worker pops this from Redis later,
+        # as a completely separate process with no direct call from here —
+        # auto-instrumentation can't bridge that gap on its own, since it
+        # has no idea this Redis list is being used as a message queue to
+        # another service rather than just a cache. propagate.inject()
+        # writes the current trace's ID into a plain dict (the same
+        # "traceparent" header format used for HTTP, just carried in JSON
+        # here instead) — worker will extract this to continue the SAME
+        # trace, rather than starting a disconnected new one.
+        carrier = {}
+        propagate.inject(carrier)
+
+        data = json.dumps({'voter_id': voter_id, 'vote': vote, 'trace_context': carrier})
         redis.rpush('votes', data)
 
     resp = make_response(render_template(
