@@ -11,6 +11,21 @@ resource "helm_release" "kube_prometheus_stack" {
     yamlencode({
       grafana = {
         adminPassword = "admin"
+        additionalDataSources = [
+          {
+            name = "Loki"
+            type = "loki"
+            url = "http://loki-gateway.observability.svc.cluster.local"
+            access = "proxy"
+            isDefault = false
+            jsonData = {
+              httpHeaderName1 = "X-Scope-OrgID"
+            }
+            secureJsonData = {
+              httpHeaderValue1 = "local"
+            }
+          }
+        ]
       }
     })
   ]
