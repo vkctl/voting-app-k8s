@@ -30,6 +30,9 @@ resource "helm_release" "loki" {
             }
           ]
         }
+        limits_config = {
+            volume_enabled = true # needed for Grafana's Logs Drilldown volume histogram
+        }
       }
       singleBinary = {
         replicas = 1
