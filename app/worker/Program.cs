@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Data.Common;
 using System.Diagnostics;
 using System.Linq;
@@ -7,6 +8,10 @@ using System.Net.Sockets;
 using System.Threading;
 using Newtonsoft.Json;
 using Npgsql;
+using OpenTelemetry;
+using OpenTelemetry.Context.Propagation;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Prometheus;
 using StackExchange.Redis;
 
@@ -40,11 +45,30 @@ namespace Worker
             "worker_db_reconnects_total", "Times the Postgres connection was recreated");
         // --- End metrics setup ---
 
+        // --- Tracing setup ---
+        // StackExchange.Redis 2.2.4 and Npgsql 4.1.9 both predate their own
+        // libraries' native OpenTelemetry integration (that arrived in later
+        // major versions with real API changes we're not making here) — so
+        // spans are created MANUALLY via ActivitySource, the actual
+        // foundation the OTel .NET SDK listens to, rather than relying on
+        // auto-instrumentation packages that wouldn't correctly cover these versions.
+        private static readonly ActivitySource WorkerActivitySource = new ActivitySource("Worker");
+        // --- End tracing setup ---
+
         public static int Main(string[] args)
         {
             var metricServer = new MetricServer(port: 9090);
             metricServer.Start();
             Console.WriteLine("Metrics server listening on :9090/metrics");
+
+            using var tracerProvider = Sdk.CreateTracerProviderBuilder()
+                .AddSource("Worker")
+                .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("worker"))
+                .AddOtlpExporter(otlp =>
+                {
+                    otlp.Endpoint = new Uri("http://alloy-traces.observability.svc.cluster.local:4317");
+                })
+                .Build();
 
             try
             {
@@ -57,7 +81,10 @@ namespace Worker
                 var keepAliveCommand = pgsql.CreateCommand();
                 keepAliveCommand.CommandText = "SELECT 1";
 
-                var definition = new { vote = "", voter_id = "" };
+                // Now includes trace_context — the carrier dict vote injected
+                // (matching the {"traceparent": "..."} shape) so this trace
+                // can be continued here, not started fresh and disconnected.
+                var definition = new { vote = "", voter_id = "", trace_context = new Dictionary<string, string>() };
                 while (true)
                 {
                     // Slow down to prevent CPU spike, only query each 100ms
@@ -79,6 +106,22 @@ namespace Worker
                         var sw = Stopwatch.StartNew();
                         var vote = JsonConvert.DeserializeAnonymousType(json, definition);
                         Console.WriteLine($"Processing vote for '{vote.vote}' by '{vote.voter_id}'");
+
+                        // Extract vote's injected trace context so the span
+                        // below joins the SAME trace as the original HTTP
+                        // request, rather than starting a disconnected new one.
+                        var parentContext = Propagators.DefaultTextMapPropagator.Extract(
+                            default,
+                            vote.trace_context,
+                            (carrier, key) => carrier != null && carrier.TryGetValue(key, out var value)
+                                ? new[] { value }
+                                : Enumerable.Empty<string>());
+
+                        using var activity = WorkerActivitySource.StartActivity(
+                            "process_vote", ActivityKind.Consumer, parentContext.ActivityContext);
+                        activity?.SetTag("voter_id", vote.voter_id);
+                        activity?.SetTag("vote", vote.vote);
+
                         // Reconnect DB if down
                         if (!pgsql.State.Equals(System.Data.ConnectionState.Open))
                         {
@@ -88,10 +131,15 @@ namespace Worker
                         }
                         else
                         { // Normal +1 vote requested
-                            var outcome = UpdateVote(pgsql, vote.voter_id, vote.vote);
+                            string outcome;
+                            using (WorkerActivitySource.StartActivity("db_write", ActivityKind.Client))
+                            {
+                                outcome = UpdateVote(pgsql, vote.voter_id, vote.vote);
+                            }
                             sw.Stop();
                             VoteProcessingDuration.Observe(sw.Elapsed.TotalSeconds);
                             VotesProcessed.Labels(outcome).Inc();
+                            activity?.SetTag("outcome", outcome);
                         }
                     }
                     else

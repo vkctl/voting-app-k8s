@@ -9,8 +9,13 @@
     <PackageReference Include="StackExchange.Redis" Version="2.2.4" />
     <PackageReference Include="Npgsql" Version="4.1.9" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
-    <!-- Base prometheus-net package (not .AspNetCore — no web framework here at all). -->
+    <!-- Base prometheus-net package (not .AspNetCore — no web framework here at all).-->
     <PackageReference Include="prometheus-net" Version="8.2.1" />
+    <!-- OTel SDK + OTLP exporter — spans created manually via ActivitySource
+         (see Program.cs comment), since StackExchange.Redis 2.2.4 / Npgsql
+         4.1.9 predate those libraries' own native OTel integration.-->
+    <PackageReference Include="OpenTelemetry" Version="1.19.1" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.19.1" />
   </ItemGroup>
 
 </Project>
