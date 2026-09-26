@@ -21,5 +21,10 @@ COPY . .
 ENV PORT=80
 EXPOSE 80
 
+# Preloads tracing.js BEFORE server.js's own requires run — required for
+# auto-instrumentation to correctly patch libraries like `pg` the first
+# time they're required, rather than after they're already loaded.
+ENV NODE_OPTIONS="--require ./tracing.js"
+
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["node", "server.js"]
