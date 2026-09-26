@@ -34,3 +34,4 @@ resource "helm_release" "tempo" {
     })
   ]
 }
+
