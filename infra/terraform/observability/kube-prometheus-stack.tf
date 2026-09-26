@@ -24,7 +24,23 @@ resource "helm_release" "kube_prometheus_stack" {
             secureJsonData = {
               httpHeaderValue1 = "local"
             }
-          }
+          },
+          {
+              name = "Tempo"
+              uid = "tempo"
+              type = "tempo"
+              url = "http://tempo.observability.svc.cluster.local:3200"
+              access = "proxy"
+              isDefault = false
+              jsonData = {
+                tracesToLogsV2 = {
+                  datasourceUid = "loki"
+                  tags = [{ key = "service.name", value = "service_name" }]
+                  filterByTraceID = false
+                  filterBySpanID  = false
+              }
+            }
+          } 
         ]
       }
     })
