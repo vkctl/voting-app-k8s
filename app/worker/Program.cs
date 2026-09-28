@@ -70,10 +70,13 @@ namespace Worker
             using var tracerProvider = Sdk.CreateTracerProviderBuilder()
                 .AddSource("Worker")
                 .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("worker"))
-                .AddOtlpExporter(otlp =>
-                {
-                    otlp.Endpoint = new Uri("http://alloy-traces.observability.svc.cluster.local:4317");
-                })
+                // No hardcoded endpoint/protocol on purpose: the SDK reads
+                // OTEL_EXPORTER_OTLP_ENDPOINT and OTEL_EXPORTER_OTLP_PROTOCOL from
+                // the environment (set in the Deployment manifest), so the
+                // collector address and gRPC-vs-HTTP choice can change via GitOps
+                // without rebuilding the image. Locally (no env vars) it defaults
+                // to localhost and just logs harmless export errors.
+                .AddOtlpExporter()
                 .Build();
 
             try
