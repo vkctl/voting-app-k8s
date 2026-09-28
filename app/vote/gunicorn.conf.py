@@ -18,12 +18,16 @@ def post_fork(server, worker):
     # AFTER it exists independently, so each gets its own working exporter.
     from opentelemetry import trace
     from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.resources import Resource
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
     from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
     from opentelemetry.instrumentation.flask import FlaskInstrumentor
     from opentelemetry.instrumentation.redis import RedisInstrumentor
 
-    provider = TracerProvider()
+    # Without an explicit service.name the SDK falls back to
+    # "unknown_service:<process name>" — which is how vote showed up in
+    # Tempo as "unknown_service:python3.11".
+    provider = TracerProvider(resource=Resource.create({"service.name": "vote"}))
     provider.add_span_processor(
         BatchSpanProcessor(
             OTLPSpanExporter(endpoint="alloy-traces.observability.svc.cluster.local:4317", insecure=True)
