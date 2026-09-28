@@ -18,6 +18,12 @@ spec:
       containers:
         - name: worker
           image: ghcr.io/vkctl/worker:dev-latest
+          imagePullPolicy: Always
+          env:
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://alloy-traces.observability.svc.cluster.local:4317"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "grpc"
           ports:
             - name: metrics
               containerPort: 9090
