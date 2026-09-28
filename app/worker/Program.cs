@@ -283,6 +283,15 @@ namespace Worker
 
         protected override void OnEventWritten(EventWrittenEventArgs eventData)
         {
+            // Other listeners in this process (prometheus-net's runtime-metrics
+            // adapter) switch on System.* EventCounters, and .NET delivers those
+            // events to every listener — which flooded the logs. Keep only
+            // OpenTelemetry's own sources.
+            if (!eventData.EventSource.Name.StartsWith("OpenTelemetry", StringComparison.Ordinal))
+            {
+                return;
+            }
+
             var payload = eventData.Payload == null ? "" : string.Join(" | ", eventData.Payload);
             Console.Error.WriteLine($"[otel:{eventData.EventSource.Name}] {eventData.Level} {eventData.EventName}: {payload}");
         }
