@@ -26,6 +26,7 @@ resource "kubernetes_manifest" "voting_app" {
                     prune = true
                     selfHeal = true
                 }
+                syncOptions = ["SkipDryRunOnMissingResource=true"]
             }
         }
     }
