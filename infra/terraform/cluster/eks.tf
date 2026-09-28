@@ -25,7 +25,7 @@ module "eks" {
       max_size       = 2
       desired_size   = 1
 
-      kubelet_extra_args = "--max-pods=32"
+      kubelet_extra_args = "--max-pods=110"
     }
   }
 

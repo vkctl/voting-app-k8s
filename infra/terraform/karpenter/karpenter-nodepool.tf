@@ -19,7 +19,7 @@ resource "kubernetes_manifest" "ec2nodeclass_default" {
         { tags = { "karpenter.sh/discovery" = "voting-app" } }
       ]
       kubelet = {
-        maxPods = 32
+        maxPods = 110
       }
     }
   }
