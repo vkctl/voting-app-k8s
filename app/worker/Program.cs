@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Diagnostics;
+using System.Diagnostics.Tracing;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -53,6 +54,7 @@ namespace Worker
         // foundation the OTel .NET SDK listens to, rather than relying on
         // auto-instrumentation packages that wouldn't correctly cover these versions.
         private static readonly ActivitySource WorkerActivitySource = new ActivitySource("Worker");
+        private static int _traceLogCount;   // limits the diagnostic line below to the first few votes
         // --- End tracing setup ---
 
         public static int Main(string[] args)
@@ -60,6 +62,10 @@ namespace Worker
             var metricServer = new MetricServer(port: 9090);
             metricServer.Start();
             Console.WriteLine("Metrics server listening on :9090/metrics");
+
+            // Surfaces the OTel SDK's own warnings/errors on stderr. Without
+            // this a failing exporter is completely silent from `kubectl logs`.
+            using var otelDiagnostics = new OtelDiagnosticsListener();
 
             using var tracerProvider = Sdk.CreateTracerProviderBuilder()
                 .AddSource("Worker")
@@ -121,6 +127,18 @@ namespace Worker
                             "process_vote", ActivityKind.Consumer, parentContext.ActivityContext);
                         activity?.SetTag("voter_id", vote.voter_id);
                         activity?.SetTag("vote", vote.vote);
+
+                        // Temporary visibility: was a span actually created, did the
+                        // context extract, and do the trace IDs match? The printed
+                        // traceId can be pasted straight into Tempo to look it up.
+                        if (_traceLogCount < 5)
+                        {
+                            _traceLogCount++;
+                            Console.WriteLine($"[trace] activity created={activity != null} " +
+                                $"traceId={activity?.TraceId} " +
+                                $"extractedParent={parentContext.ActivityContext.TraceId} " +
+                                $"carrierKeys=[{string.Join(",", vote.trace_context?.Keys ?? Enumerable.Empty<string>())}]");
+                        }
 
                         // Reconnect DB if down
                         if (!pgsql.State.Equals(System.Data.ConnectionState.Open))
@@ -243,6 +261,27 @@ namespace Worker
             {
                 command.Dispose();
             }
+        }
+    }
+
+    // The OpenTelemetry .NET SDK reports its own problems (failed exports,
+    // dropped spans) to internal EventSources — NOT stdout — so a broken
+    // exporter looks perfectly healthy from `kubectl logs`. This subscribes
+    // to those sources and prints anything at Warning level or above.
+    internal sealed class OtelDiagnosticsListener : EventListener
+    {
+        protected override void OnEventSourceCreated(EventSource eventSource)
+        {
+            if (eventSource.Name.StartsWith("OpenTelemetry", StringComparison.Ordinal))
+            {
+                EnableEvents(eventSource, EventLevel.Warning);
+            }
+        }
+
+        protected override void OnEventWritten(EventWrittenEventArgs eventData)
+        {
+            var payload = eventData.Payload == null ? "" : string.Join(" | ", eventData.Payload);
+            Console.Error.WriteLine($"[otel:{eventData.EventSource.Name}] {eventData.Level} {eventData.EventName}: {payload}");
         }
     }
 }
