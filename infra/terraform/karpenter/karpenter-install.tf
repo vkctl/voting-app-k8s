@@ -29,5 +29,10 @@ resource "helm_release" "karpenter" {
     value = data.aws_sqs_queue.karpenter.name
   }
 
+  set {
+    name = "replicas"
+    value = "1"
+  }
+
   depends_on = [helm_release.karpenter_crd]
 }

@@ -19,11 +19,11 @@ module "eks" {
 # option c: increase desired nodes
   eks_managed_node_groups = {
     default = {
-      instance_types = ["t3.small"]
+      instance_types = ["m7i-flex.large"]
       capacity_type  = "ON_DEMAND"
       min_size       = 1
-      max_size       = 8
-      desired_size   = 3
+      max_size       = 2
+      desired_size   = 1
 
       kubelet_extra_args = "--max-pods=32"
     }
