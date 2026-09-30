@@ -94,6 +94,15 @@ namespace Worker
                 // (matching the {"traceparent": "..."} shape) so this trace
                 // can be continued here, not started fresh and disconnected.
                 var definition = new { vote = "", voter_id = "", trace_context = new Dictionary<string, string>() };
+                // Wall-clock timer, not an iteration count: with the sleep
+                // removed from the busy path, the loop runs as fast as
+                // possible under load, so counting iterations would sample
+                // far more often under load than at idle. A time-based check
+                // keeps this at roughly one LLEN per second regardless of
+                // throughput — this metric doesn't need per-vote precision,
+                // and calling it every iteration was doubling worker's Redis
+                // traffic under load (one LLEN for every LPOP).
+                var lastQueueSample = DateTime.MinValue;
                 while (true)
                 {
                     // Reconnect redis if down
@@ -104,7 +113,11 @@ namespace Worker
                         RedisReconnects.Inc();
                     }
 
-                    RedisQueueLength.Set(redis.ListLength("votes"));
+                    if (DateTime.UtcNow - lastQueueSample > TimeSpan.FromSeconds(1))
+                    {
+                        RedisQueueLength.Set(redis.ListLength("votes"));
+                        lastQueueSample = DateTime.UtcNow;
+                    }
 
                     string json = redis.ListLeftPopAsync("votes").Result;
                     if (json != null)
