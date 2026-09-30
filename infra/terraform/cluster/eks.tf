@@ -22,8 +22,8 @@ module "eks" {
       instance_types = ["m7i-flex.large"]
       capacity_type  = "ON_DEMAND"
       min_size       = 1
-      max_size       = 2
-      desired_size   = 1
+      max_size       = 3
+      desired_size   = 2
 
       kubelet_extra_args = "--max-pods=110"
     }
