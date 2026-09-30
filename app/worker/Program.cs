@@ -96,9 +96,6 @@ namespace Worker
                 var definition = new { vote = "", voter_id = "", trace_context = new Dictionary<string, string>() };
                 while (true)
                 {
-                    // Slow down to prevent CPU spike, only query each 100ms
-                    Thread.Sleep(100);
-
                     // Reconnect redis if down
                     if (redisConn == null || !redisConn.IsConnected) {
                         Console.WriteLine("Reconnecting Redis");
@@ -166,6 +163,16 @@ namespace Worker
                     else
                     {
                         keepAliveCommand.ExecuteNonQuery();
+                        // Only sleep when there was nothing to do — this is
+                        // the actual fix. The original unconditional sleep
+                        // here delayed EVERY vote by 100ms regardless of
+                        // whether a backlog existed, capping real throughput
+                        // at ~10/s even though db_write itself measured
+                        // ~1.6ms. Sleeping only on an empty queue keeps the
+                        // original "don't busy-loop when idle" intent (the
+                        // actual reason the delay existed) without
+                        // throttling real work when there's a backlog to drain.
+                        Thread.Sleep(100);
                     }
                 }
             }
