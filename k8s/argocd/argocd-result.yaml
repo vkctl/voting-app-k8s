@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: result
-          image: ghcr.io/vkctl/result@sha256:e7af2de28ed13641c1331f1c4c116eccd07377c72053199a0024bb9e31702aae  # pinned from dev-latest
+          image: ghcr.io/vkctl/result@sha256:e7af2de28ed13641c1331f1c4c116eccd07377c72053199a0024bb9e31702aae  # pinned from v1.1.0
           ports:
             - containerPort: 80
           resources:

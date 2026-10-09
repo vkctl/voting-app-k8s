@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: vote
-          image: ghcr.io/vkctl/vote@sha256:cae8f0db11b1121c23d987b6d6125d80335bb450d05b4771b987ae69181556d4  # pinned from dev-latest
+          image: ghcr.io/vkctl/vote@sha256:cae8f0db11b1121c23d987b6d6125d80335bb450d05b4771b987ae69181556d4  # pinned from v1.1.0
           imagePullPolicy: Always
           ports:
             - containerPort: 80
