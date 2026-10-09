@@ -5,7 +5,7 @@ on:
     tags: ['v*.*.*']
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 env:
@@ -15,15 +15,13 @@ env:
 jobs:
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-
     steps:
-      - name: checkout code
-        uses: actions/Checkout@v7
+      - name: Checkout (tag)
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - name: login to GHCR
+      - name: Log in to GHCR
         uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
@@ -31,27 +29,57 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Resolve target version
-        id: vars
-        run: |
-          echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+        id: ver
+        run: echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Retag existing version as the release version
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
+          set -euo pipefail
           SERVICES=(vote worker result)
           for svc in "${SERVICES[@]}"; do
             SVC_SHA=$(git log -1 --format=%h -- "app/$svc")
-            if [[ -z "$SVC_SHA" ]]; then
-              echo "::error::No commit found touching app/$svc — can't resolve an image"
-              exit 1
+            if [ -z "$SVC_SHA" ]; then
+              echo "::error::no commit found for app/$svc"; exit 1
             fi
-
-            SRC="${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/$svc:$SVC_SHA"
-            DEST="${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/$svc:${{ steps.vars.outputs.version }}"
-
-            echo "==> $svc last changed at $SVC_SHA - pulling $SRC"
+            SRC="$REGISTRY/$IMAGE_OWNER/$svc:$SVC_SHA"
+            DST="$REGISTRY/$IMAGE_OWNER/$svc:$VERSION"
             docker pull "$SRC"
-
-            echo "==> tagging as $DEST"
-            docker tag "$SRC" "$DEST"
-            docker push "$DEST"
+            docker tag "$SRC" "$DST"
+            docker push "$DST"
           done
+
+      - name: Pin image digests in manifests and commit to main
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          PIN_REGISTRY="$REGISTRY/$IMAGE_OWNER"
+
+          # The tag checkout is a detached HEAD; the pin commit must land on main.
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+
+          REGISTRY="$PIN_REGISTRY" bash scripts/pin-image-digests.sh "$VERSION" vote worker result
+
+          if git diff --quiet -- k8s/argocd; then
+            echo "Manifests already pinned to these digests - nothing to commit."
+            exit 0
+          fi
+
+          git add k8s/argocd
+          git commit -m "release: pin image digests for $VERSION"
+
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then
+              echo "Pushed pin commit."
+              exit 0
+            fi
+            echo "Push rejected (attempt $attempt) - rebasing and retrying"
+            git pull --rebase origin main
+          done
+          echo "::error::could not push pin commit to main"
+          exit 1
