@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: worker
-          image: ghcr.io/vkctl/worker:dev-latest
+          image: ghcr.io/vkctl/worker@sha256:f71206c3e03f11447898346e3a521e5c6f131c18c60fb7a413d6606c2965ed99  # pinned from dev-latest
           imagePullPolicy: Always
           env:
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
